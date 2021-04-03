@@ -2,8 +2,12 @@
 
 namespace App\Exceptions;
 
+use Exception;
 use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
-use Throwable;
+use Illuminate\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\MethodNotAllowedHttpException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Symfony\Component\HttpKernel\Exception\UnauthorizedHttpException;
 
 class Handler extends ExceptionHandler
 {
@@ -34,8 +38,76 @@ class Handler extends ExceptionHandler
      */
     public function register()
     {
-        $this->reportable(function (Throwable $e) {
-            //
+        $this->renderable(function(Exception $e) {
+
+            if ($e instanceof ValidationException){
+                return $this->validationError($e);
+            }
+
+            if ($e instanceof NotFoundHttpException){
+                return $this->notFoundError();
+            }
+
+            if ($e instanceof UnauthorizedHttpException){
+                return $this->unAuthorizeError();
+            }
+
+            if ($e instanceof MethodNotAllowedHttpException){
+                return $this->methodNotAllowedError();
+            }
+
+            return $this->debugErrors($e->getMessage());
         });
+    }
+
+    private function debugErrors($e){
+        return response()->json([
+            'success' => false,
+            'code' => 500,
+            'message' => $e,
+            'data' => null
+        ]);
+    }
+
+    private function methodNotAllowedError(){
+        return response()->json([
+            'success' => false,
+            'code' => 405,
+            'message' => 'Method not allowed',
+            'data' => null
+        ]);
+    }
+
+    private function unAuthorizeError(){
+        return response()->json([
+            'success' => false,
+            'code' => 403,
+            'message' => 'UnAuthorized',
+            'data' => null
+        ]);
+    }
+
+    private function notFoundError(){
+        return response()->json([
+            'success' => false,
+            'code' => 404,
+            'message' => 'Not found',
+            'data' => null
+        ]);
+    }
+
+    private function validationError($e){
+        return response()->json([
+            'success' => false,
+            'code' => 400,
+            'message' => $this->errorValidation($e)[0],
+            'data' => null
+        ]);
+    }
+
+    private function errorValidation($exception)
+    {
+        $errors = collect($exception->errors());
+        return $errors->unique()->first();
     }
 }
